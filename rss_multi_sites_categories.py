@@ -1,382 +1,353 @@
-import csv
 import os
 import re
-import unicodedata
+import csv
+import time
+import urllib.parse
 from datetime import datetime, timezone
-from urllib.parse import urlparse
 import feedparser
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-OUTPUT_FILE = "output/rss_history.csv"
-LOG_FILE = "output/log.txt"
+# File path definition
+CSV_FILE = os.path.join("output", "rss_history.csv")
 
-# ============================================================
-# 1. Configuration des Sources (11 Flux RSS + HTML Frandroid)
-# ============================================================
-
+# RSS Feeds List
 RSS_FEEDS = {
-    "Frandroid - RSS": "https://www.frandroid.com/feed",
-    "Phonandroid": "https://www.phonandroid.com/feed",
     "01net": "https://www.01net.com/feed/",
-    "Numerama": "https://www.numerama.com/feed/",
-    "CCM": "https://www.commentcamarche.net/rss/?output=xml",
-    "KultureGeek": "http://feeds.feedburner.com/Kulturegeek",
     "JournalDuGeek": "https://www.journaldugeek.com/feed/",
     "LesNumeriques": "https://www.lesnumeriques.com/rss.xml",
-    "Korben": "https://korben.info/feed",
-    "NextInpact": "https://www.nextinpact.com/rss",
+    "Frandroid - RSS": "https://www.frandroid.com/feed",
+    "Phonandroid": "https://www.phonandroid.com/feed",
+    "Numerama": "https://www.numerama.com/feed/",
+    "KultureGeek": "https://kulturegeek.fr/feed",
     "TomsHardware": "https://www.tomshardware.fr/feed/",
-    "Clubic": "https://www.clubic.com/feed/",
+    "NextInpact": "https://www.nextinpact.com/rss/news.xml",
+    "Korben": "https://korben.info/feed",
+    "CCM": "https://www.commentcamarche.net/rss/rss-actualites",
 }
 
-FRANDROID_SECTIONS = {
-    "Frandroid - Actualités": "https://www.frandroid.com/actualites",
-    "Frandroid - Tests": "https://www.frandroid.com/test",
-    "Frandroid - Bons plans": "https://www.frandroid.com/bon-plan",
-}
-
-# ============================================================
-# 2. Définition des Mots-Clés et Catégories (19 Catégories)
-# ============================================================
-
+# Categories dictionary with Sponso in 1st position
 CATEGORIES = {
-    "SMARTPHONE": [
-        "smartphone", "téléphone", "phone", "l'iphone", "iphone", "pixel", "flip", "siri", "forfait", 
-        "android", "GrapheneOS", "ios", "5G", "6G", "réseau", "Esim", "Wifi", "wi-fi", "routeur", 
-        "netgear", "ethernet", "traceur", "Tag", "lunette", "appli", "application", "anker", "redmi", 
-        "whatsapp", "spacex", "strarlink", "sosh", "Honor", "One Ui", "poco", "realme", "Galaxy S"
+    "19. Sponso": [
+        "bon plan", "bons plans", "brade", "promotion", "sponsorisé", "comparatif",
+        "bons-plans", "humanoid"
     ],
-    "PC": [
-        "PC", "Geekom", "Framework", "SSD", "serveur", "Nas", "portable", "macbook", "asus", "lenovo", 
-        "HP", "Dell", "acer", "MSI ryzen", "qualcomm", "Media Tek", "snapdragon", "amd", "nvdia", 
-        "puce graphique", "Galaxy book"
+    "1. SMARTPHONE": [
+        "smartphone", "téléphone", "phone", "iphone", "pixel", "flip", "siri", "forfait",
+        "android", "grapheneos", "ios", "5g", "6g", "réseau", "esim", "wifi", "wi-fi",
+        "routeur", "netgear", "ethernet", "traceur", "tag", "lunette", "appli",
+        "application", "anker", "redmi", "whatsapp", "spacex", "starlink", "sosh",
+        "honor", "one ui", "poco", "realme", "galaxy s", "oppo"
     ],
-    "PERIPHERIQUE": [
-        "Clavier", "écran", "moniteur", "souris", "l'imprimante", "imprimante", "logitech", "corsair", 
-        "steam deck", "chargeur", "charge", "batterie externe", "ugreen", "branche", "lexar", 
-        "périphérique", "hub", "dock", "usb", "usb-c", "Ram", "chaise"
+    "2. PC": [
+        "pc", "geekom", "framework", "ssd", "serveur", "nas", "portable", "macbook",
+        "asus", "lenovo", "hp", "dell", "acer", "msi", "ryzen", "qualcomm", "mediatek",
+        "snapdragon", "amd", "nvidia", "puce graphique", "galaxy book", "carte mère"
     ],
-    "TABLETTE": [
-        "Tablette", "Fold", "pad", "tab", "kindle", "remarkable", "liseuse", "kobo", "ebooks", "pliable", 
-        "pliure", "pli", "Galaxy tab"
+    "3. Periphérique": [
+        "clavier", "écran", "moniteur", "souris", "imprimante", "logitech", "corsair",
+        "steam deck", "chargeur", "charge", "batterie externe", "ugreen", "branche",
+        "lexar", "périphérique", "hub", "dock", "usb", "usb-c", "ram", "chaise", "rj45"
     ],
-    "LOGICIELS_OS": [
-        "Logiciels", "sofware", "windows", "macos", "power Toys", "office", "windows", "linux", "Bios", 
-        "OS", "mail", "rss", "slack", "teams", "capture", "outlook", "onenote", "gmail", "drive", 
-        "cleaner", "VPN", "traduction", "chat", "automatisation", "edge", "chrome", "safari", "firefox", 
-        "mozilla", "opera", "vivaldi", "moteur de recherche", "github", "zip", "terminal", "torrent", 
-        "chatbot", "interface", "wordpress", "web", "navigateur"
+    "4. Tablette": [
+        "tablette", "fold", "pad", "tab", "kindle", "remarkable", "liseuse", "kobo",
+        "ebooks", "pliable", "pliure", "pli", "galaxy tab"
     ],
-    "IA": [
-        "l'IA", "IA", "AI", "intelligence artificielle", "data center", "LLM", "token", "anthropic", 
-        "d'openAI", "openAI", "chatgpt", "gemini", "meta", "Claude", "openclaw", "perplexity", "prompt", 
-        "copilot", "gemini", "deepseek", "mistral", "groq", "midjourney"
+    "5. Logiciels _ OS": [
+        "logiciels", "software", "windows", "macos", "powertoys", "office", "linux",
+        "bios", "os", "mail", "rss", "slack", "teams", "capture", "outlook", "onenote",
+        "gmail", "drive", "cleaner", "vpn", "traduction", "chat", "automatisation",
+        "edge", "chrome", "safari", "firefox", "mozilla", "opera", "vivaldi",
+        "moteur de recherche", "github", "zip", "terminal", "torrent", "chatbot",
+        "interface", "wordpress", "web", "navigateur", "google keep", "patch", "virus",
+        "bloqueur", "dns", "expressvpn", "cyberghost", "surfshark", "pcloud", "cpanel",
+        "gnome", "fedora", "ubuntu"
     ],
-    "VIDEO": [
-        "Iptv", "vids", "télévision", "téléviseur", "TV", "omni", "pics", "vlc", "video", "éditeur", 
-        "3D", "plex", "téléviseur", "LG", "hisense", "TCL", "Hdmi", "RGB", "videoprojecteur", "Awol", 
-        "xgimi", "Jmgo", "stick", "DJI", "osmo", "Insta360", "cast", "graphique", "édition", "image", 
-        "gopro", "affichage"
+    "6. IA": [
+        "ia", "ai", "intelligence artificielle", "data center", "llm", "token",
+        "anthropic", "openai", "chatgpt", "gemini", "meta", "claude", "openclaw",
+        "perplexity", "prompt", "copilot", "deepseek", "mistral", "groq", "midjourney", "grok"
     ],
-    "AUDIO": [
-        "casque", "audio", "casque audio", "casque gaming", "pods", "buds", "headphone", "jbl", 
-        "shockz", "clip", "écouteurs", "réduction de bruit", "enceinte", "barre de son", "harman", 
-        "sennheiser", "bose", "sonos", "égaliseur", "musique"
+    "7. Video": [
+        "iptv", "vids", "télévision", "téléviseur", "tv", "omni", "pics", "vlc", "video",
+        "éditeur", "3d", "plex", "lg", "hisense", "tcl", "hdmi", "rgb", "vidéoprojecteur",
+        "awol", "xgimi", "jmgo", "stick", "dji", "osmo", "insta360", "cast", "graphique",
+        "édition", "image", "gopro", "affichage"
     ],
-    "MOBILITE_DOUCE": [
-        "mobilité", "vélo", "trottinette", "cargo", "sacoche", "antivol", "VAE", "navigo", "blablacar", 
-        "taxi", "rer", "transport en commun", "ebike", "vtt", "segway", "veste"
+    "8. Audio": [
+        "casque", "audio", "casque audio", "casque gaming", "pods", "buds", "headphone",
+        "jbl", "shockz", "clip", "écouteurs", "réduction de bruit", "enceinte",
+        "barre de son", "harman", "sennheiser", "bose", "sonos", "égaliseur", "musique"
     ],
-    "VOITURE": [
-        "voiture", "automobile", "conduite", "conduire", "rouler", "essence", "carburant", "monospace", 
-        "berline", "citadine", "SUV", "permis", "volkswagen", "mercedes", "bmw", "byd", "mg", "renault", 
-        "peugeot", "toyota", "nissan", "stellantis", "citroen", "dacia", "kia", "fiat", "tesla", "ford", 
-        "jeep", "twingo", "autonome", "FSD", "waze", "google maps", "auto", "carplay", "taxe", "moto", 
-        "scooter", "hybride", "voiture électrique", "borne"
+    "9. Moiilité douce": [
+        "mobilité", "vélo", "trottinette", "cargo", "sacoche", "antivol", "vae", "navigo",
+        "blablacar", "taxi", "rer", "transport en commun", "ebike", "vtt", "segway",
+        "veste", "avion", "aéroport"
     ],
-    "MENAGE": [
-        "aspirateur", "robot aspirateur", "dyson", "roborock", "narwal", "mova", "ecovacs", "dreame", 
-        "tineco", "shark", "laveur", "lavage", "machine à laver", "vitres", "pressing", "défroisseur", 
-        "centrale vapeur", "fer à repasser", "tambour", "maison", "linge", "vaisselle", "lave-vaisselle", 
-        "vitre", "brosse à dent", "facture", "argent", "vapeur", "ventilateur", "nettoyeur", "nettoyant", 
-        "purificateur"
+    "10. Voiture": [
+        "voiture", "automobile", "conduite", "conduire", "rouler", "essence", "carburant",
+        "monospace", "berline", "citadine", "suv", "permis", "volkswagen", "mercedes",
+        "bmw", "byd", "mg", "renault", "peugeot", "toyota", "nissan", "stellantis",
+        "citroen", "dacia", "kia", "fiat", "tesla", "ford", "jeep", "twingo", "autonome",
+        "fsd", "waze", "google maps", "auto", "carplay", "taxe", "moto", "scooter",
+        "hybride", "voiture électrique", "borne"
     ],
-    "CUISINE": [
-        "Airfryer", "ninja", "moulinex", "thermomix", "cookeo", "coffee", "delonghi", "tefal", 
-        "cuisine", "plaque", "four", "cafetière", "café", "expresso", "barbecue", "kenwood", "soda", 
-        "agrume", "frigo", "réfrigérateur", "congélateur", "plante", "jardin", "chauffage", "chaudière", 
-        "climatiseur", "prise", "home"
+    "11. Menage": [
+        "aspirateur", "robot aspirateur", "dyson", "roborock", "narwal", "mova", "ecovacs",
+        "dreame", "tineco", "shark", "laveur", "lavage", "machine à laver", "vitres",
+        "pressing", "défroisseur", "centrale vapeur", "fer à repasser", "tambour",
+        "maison", "linge", "vaisselle", "lave-vaisselle", "vitre", "brosse à dent",
+        "facture", "argent", "vapeur", "ventilateur", "nettoyeur", "nettoyant", "purificateur"
     ],
-    "MAISON": [
-        "solaire", "électricité", "compteur", "gaz", "énergie", "EDF", "solar", "starlink", "box", 
-        "hue", "ikea", "robot", "freebox", "livebox", "home", "matter", "fibre", "caméra", "surveillance", 
-        "serrure", "nuki", "sonnette", "keypad", "clé", "thermostat", "linky", "tuya", "aqara"
+    "12. Cuisine": [
+        "airfryer", "ninja", "moulinex", "thermomix", "cookeo", "coffee", "delonghi",
+        "tefal", "cuisine", "plaque", "four", "cafetière", "café", "expresso", "barbecue",
+        "kenwood", "soda", "agrume", "frigo", "réfrigérateur", "congélateur", "plante",
+        "jardin", "chauffage", "chaudière", "climatiseur", "prise", "home"
     ],
-    "SANTE": [
-        "Santé", "fitbit", "bracelet", "circa", "montre", "watch", "sommeil", "dormir", "ondes", 
-        "withings", "peau", "sport", "course", "natation", "coros", "coach", "outdoor", "garmin", 
-        "polar", "amazfit", "suunto", "muscle", "musculation", "randonnée", "band", "bracelet", 
-        "whoop", "ecg", "artérielle", "bague"
+    "13. Maison": [
+        "solaire", "électricité", "compteur", "gaz", "énergie", "edf", "solar", "starlink",
+        "box", "hue", "ikea", "robot", "freebox", "livebox", "home", "matter", "fibre",
+        "caméra", "surveillance", "serrure", "nuki", "sonnette", "keypad", "clé",
+        "thermostat", "linky", "tuya", "aqara", "vin"
     ],
-    "LUDIQUE": [
-        "jeu", "jeux", "ludique", "jeux de société", "jeux vidéo", "jeu vidéo", "enfant", "cinéma", 
-        "film", "switch", "playstation", "xbox", "manette", "VR", "casque VR", "netflix", "canal", 
-        "TF1", "cinema", "série", "ps5", "ps4", "nintendo", "steam", "gaming", "spotify", "valve", 
-        "zelda", "mario", "super mario", "mariokart", "Pokemon", "ubisoft", "console", "drone", 
-        "neo geo", "sega", "GTA"
+    "14. Santé": [
+        "santé", "fitbit", "bracelet", "circa", "montre", "watch", "sommeil", "dormir",
+        "ondes", "withings", "peau", "sport", "course", "natation", "coros", "coach",
+        "outdoor", "garmin", "polar", "amazfit", "suunto", "muscle", "musculation",
+        "randonnée", "band", "whoop", "ecg", "artérielle", "bague"
     ],
-    "ACTU_JUR_POL": [
-        "UE", "Cnil", "souveraineté", "europe", "chine", "russie", "Iran", "condamnée", "condamné", 
-        "condamne", "gafam", "conseil d'état", "arcom", "RGPD", "IA Act", "Bruxelles", "union européenne", 
-        "Otan", "procès", "plaintes", "règles", "réglementaton", "loi", "juge", "justice", "tribunal", 
-        "sanction", "DSA", "politique", "onu", "la France", "Etat", "Trump", "commission européenne", 
-        "géopolitique", "diplomatie", "cyberattaque", "piratage", "taxe", "présidentielle", "amende", 
-        "décret", "législation", "démarchage", "fraude", "vie privée", "interdiction", "réseaux sociaux", 
-        "arnaque", "fuite de données", "régulateur", "régulation", "légal", "légalité", "illégal", 
-        "illégalle", "ANSSI"
+    "15. ludique": [
+        "jeu", "jeux", "ludique", "jeux de société", "jeux vidéo", "jeu vidéo", "enfant",
+        "cinéma", "film", "switch", "playstation", "xbox", "manette", "vr", "casque vr",
+        "netflix", "canal", "tf1", "série", "ps5", "ps4", "nintendo", "steam", "gaming",
+        "spotify", "valve", "zelda", "mario", "super mario", "mariokart", "pokemon",
+        "ubisoft", "console", "drone", "neo geo", "sega", "gta", "streaming", "media"
     ],
-    "ACTU_ECO": [
-        "dépense", "bourse", "milliards", "rachat", "capitalisation", "acquisition", "argent", "OPA", 
-        "fusion", "bulle", "usine", "production", "productivité", "salaires", "salariés", "employé", 
-        "grève", "énergie", "énergétique", "rente", "rentable", "perte", "bénéfice", "chiffre d'affaires", 
-        "comptable", "crise", "pénurie", "inflation", "résultats financiers", "chômage", "licenciement", 
+    "16. actu jur et pol": [
+        "ue", "cnil", "souveraineté", "europe", "chine", "russie", "iran", "condamnée",
+        "condamné", "condamne", "gafam", "conseil d'état", "arcom", "rgpd", "ia act",
+        "bruxelles", "union européenne", "otan", "procès", "plaintes", "règles",
+        "réglementation", "loi", "juge", "justice", "tribunal", "sanction", "dsa",
+        "politique", "onu", "la france", "etat", "trump", "commission européenne",
+        "géopolitique", "diplomatie", "cyberattaque", "piratage", "taxe", "présidentielle",
+        "amende", "décret", "législation", "démarchage", "fraude", "vie privée",
+        "interdiction", "réseaux sociaux", "arnaque", "fuite de données", "régulateur",
+        "régulation", "légal", "légalité", "illégal", "anssi", "crypto", "police",
+        "données", "cookies", "ministre", "ministère", "usurpation"
+    ],
+    "17. Actualité éco": [
+        "dépense", "bourse", "milliards", "rachat", "capitalisation", "acquisition",
+        "argent", "opa", "fusion", "bulle", "usine", "production", "productivité",
+        "salaires", "salariés", "employé", "grève", "énergie", "énergétique", "rente",
+        "rentable", "perte", "bénéfice", "chiffre d'affaires", "comptable", "crise",
+        "pénurie", "inflation", "résultats financiers", "chômage", "licenciement",
         "patron"
     ],
-    "SCIENCES": [
-        "Nasa", "planète", "spatiale", "fusée", "lune", "soleil", "mars", "CNRS", "téléscope"
-    ],
-    "SPONSO": [
-        "bon plan", "bons plans", "brade", "promotion", "sponsorisé"
+    "18. Sciences": [
+        "nasa", "planète", "spatiale", "fusée", "lune", "soleil", "mars", "cnrs",
+        "télescope", "l'espace", "satellite"
     ]
 }
 
-# ============================================================
-# 3. Fonctions Utilitaires & Catégorisation
-# ============================================================
 
-def log_error(msg):
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{datetime.now(timezone.utc)}] {msg}\n")
+def clean_url(url):
+    """Clean tracking parameters from URLs."""
+    parsed = urllib.parse.urlparse(url)
+    qd = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+    filtered = {k: v for k, v in qd.items() if not k.startswith("utm_")}
+    new_query = urllib.parse.urlencode(filtered, doseq=True)
+    return urllib.parse.urlunparse(
+        (parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment)
+    )
 
-def normalize(text):
-    if not isinstance(text, str):
-        return ""
-    text = unicodedata.normalize("NFD", text)
-    text = text.encode("ascii", "ignore").decode("utf-8")
-    return text.lower()
 
-# Pré-normalisation des mots-clés
-NORM_CATEGORIES = {
-    cat: [normalize(kw) for kw in keywords]
-    for cat, keywords in CATEGORIES.items()
-}
+def categorize_article(title, url):
+    """Classify articles based on title and URL against the CATEGORIES dictionary."""
+    text_to_check = f"{title.lower()} {url.lower()}"
 
-def categorize(title):
-    """
-    Catégorise selon les mots du titre avec isolation par frontière de mot (\b).
-    - Mot simple : détecte le singulier et le pluriel (avec un 's' final).
-    - Expression composée : détecte le terme exact.
-    """
-    norm_title = normalize(title)
-    for category, keywords in NORM_CATEGORIES.items():
-        for kw in keywords:
-            if " " in kw or "-" in kw or "'" in kw:
-                pattern = r"\b" + re.escape(kw) + r"\b"
-            else:
-                pattern = r"\b" + re.escape(kw) + r"s?\b"
-                
-            if re.search(pattern, norm_title):
+    for category, keywords in CATEGORIES.items():
+        for keyword in keywords:
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, text_to_check):
                 return category
+
     return "NON_CLASSE"
 
-def parse_date(date_val):
-    if not date_val:
+
+def parse_date(date_str):
+    """Parse ISO formatted dates."""
+    if not date_str:
         return None
-    if isinstance(date_val, datetime):
-        return date_val if date_val.tzinfo else date_val.replace(tzinfo=timezone.utc)
     try:
-        dt = datetime.fromisoformat(str(date_val).replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return datetime.fromisoformat(date_str)
     except Exception:
         return None
 
-# ============================================================
-# 4. Scraping RSS et HTML
-# ============================================================
 
-def scrape_rss(name, url):
-    print(f"[RSS] Collecte de {name}...")
-    articles = []
+def scrape_rss(source_name, feed_url):
+    """Fetch items from a standard RSS feed."""
+    items = []
     try:
-        feed = feedparser.parse(url)
+        feed = feedparser.parse(feed_url)
         for entry in feed.entries:
+            title = entry.get("title", "").strip()
+            link = clean_url(entry.get("link", "").strip())
+
             dt = None
             if hasattr(entry, "published_parsed") and entry.published_parsed:
-                try:
-                    dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-                except Exception:
-                    dt = None
+                dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
             elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
+                dt = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+
+            category = categorize_article(title, link)
+
+            items.append({
+                "source": source_name,
+                "date": dt,
+                "title": title,
+                "link": link,
+                "category": category
+            })
+    except Exception as e:
+        print(f"Error scraping {source_name}: {e}")
+
+    return items
+
+
+def scrape_frandroid_web(url, source_name):
+    """Scrape web pages specifically for Frandroid sections."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    items = []
+
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code != 200:
+            return items
+
+        soup = BeautifulSoup(res.text, "html.parser")
+        articles = soup.find_all("article")
+
+        for article in articles:
+            a_tag = article.find("a", href=True)
+            if not a_tag:
+                continue
+
+            link = clean_url(a_tag["href"])
+            title = a_tag.get_text(strip=True)
+
+            time_tag = article.find("time")
+            dt = None
+            if time_tag and time_tag.has_attr("datetime"):
                 try:
-                    dt = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+                    dt = datetime.fromisoformat(time_tag["datetime"].replace("Z", "+00:00"))
                 except Exception:
                     dt = None
 
-            title = entry.get("title", "").strip()
-            link = entry.get("link", "").strip()
-
-            if title and link:
-                articles.append({
-                    "source": name,
+            if title:
+                category = categorize_article(title, link)
+                items.append({
+                    "source": source_name,
                     "date": dt,
-                    "titre": title,
-                    "lien": link,
-                    "categorie": categorize(title)
+                    "title": title,
+                    "link": link,
+                    "category": category
                 })
+
     except Exception as e:
-        log_error(f"Erreur RSS {name}: {e}")
-    return articles
+        print(f"Error scraping Frandroid {source_name}: {e}")
 
-def get_frandroid_article_date(url):
-    try:
-        resp = requests.get(url, timeout=8)
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            time_tag = soup.find("time")
-            if time_tag and time_tag.get("datetime"):
-                return parse_date(time_tag["datetime"])
-    except Exception as e:
-        log_error(f"Erreur date Frandroid {url}: {e}")
-    return None
+    return items
 
-def scrape_frandroid_html():
-    articles = []
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-    for section_name, base_url in FRANDROID_SECTIONS.items():
-        for page in range(1, 4):
-            url = base_url if page == 1 else f"{base_url}/page/{page}"
-            print(f"[HTML] Scraping {section_name} - Page {page}...")
-            try:
-                resp = requests.get(url, headers=headers, timeout=10)
-                if resp.status_code != 200:
-                    continue
-                soup = BeautifulSoup(resp.text, "html.parser")
-                cards = soup.find_all("article")
+def load_existing_history(filepath):
+    """Load existing articles from CSV to avoid duplicates."""
+    history = {}
+    if not os.path.exists(filepath):
+        return history
 
-                for card in cards:
-                    a = card.find("a")
-                    if not a:
-                        continue
-                    link = a.get("href", "").strip()
-                    title = a.get_text(strip=True)
+    with open(filepath, mode="r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            link = row.get("lien")
+            if link:
+                history[link] = {
+                    "source": row.get("source", ""),
+                    "date": parse_date(row.get("date")),
+                    "title": row.get("titre", ""),
+                    "link": link,
+                    "category": row.get("categorie", "NON_CLASSE")
+                }
+    return history
 
-                    if link and title:
-                        dt = get_frandroid_article_date(link)
-                        articles.append({
-                            "source": section_name,
-                            "date": dt,
-                            "titre": title,
-                            "lien": link,
-                            "categorie": categorize(title)
-                        })
-            except Exception as e:
-                log_error(f"Erreur Frandroid HTML {url}: {e}")
-    return articles
-
-# ============================================================
-# 5. Gestion de l'Historique (Lecture, Fusion, Déduplication)
-# ============================================================
-
-def load_existing_history():
-    articles = []
-    if not os.path.exists(OUTPUT_FILE):
-        return articles
-
-    try:
-        df_old = pd.read_csv(OUTPUT_FILE, sep=";", encoding="utf-8-sig")
-        for _, row in df_old.iterrows():
-            title = str(row.get("titre", "")).strip()
-            link = str(row.get("lien", "")).strip()
-            source = str(row.get("source", "")).strip()
-            date_val = parse_date(row.get("date", ""))
-            
-            # Recatégorise systématiquement avec les nouvelles catégories
-            cat = str(row.get("categorie", ""))
-            if not cat or cat == "nan" or cat == "NON_CLASSE":
-                cat = categorize(title)
-            else:
-                new_cat = categorize(title)
-                if new_cat != "NON_CLASSE":
-                    cat = new_cat
-
-            if link and title:
-                articles.append({
-                    "source": source,
-                    "date": date_val,
-                    "titre": title,
-                    "lien": link,
-                    "categorie": cat
-                })
-        print(f"[Historique] {len(articles)} anciens articles chargés depuis le CSV.")
-    except Exception as e:
-        log_error(f"Erreur chargement CSV existant : {e}")
-
-    return articles
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main():
-    all_articles = []
+    os.makedirs("output", exist_ok=True)
+    history = load_existing_history(CSV_FILE)
+    print(f"Existing articles in history: {len(history)}")
 
-    # 1. Charger l'historique CSV existant
-    all_articles.extend(load_existing_history())
+    new_items_count = 0
 
-    # 2. Collecter les flux RSS
-    for name, url in RSS_FEEDS.items():
-        all_articles.extend(scrape_rss(name, url))
+    # 1. Gather standard RSS feeds
+    for source, url in RSS_FEEDS.items():
+        print(f"Scraping RSS: {source}...")
+        items = scrape_rss(source, url)
+        for item in items:
+            link = item["link"]
+            if link not in history:
+                history[link] = item
+                new_items_count += 1
+            else:
+                # Recategorize existing items with the updated dictionary
+                history[link]["category"] = categorize_article(history[link]["title"], link)
 
-    # 3. Collecter les rubriques HTML de Frandroid (3 pages chacune)
-    all_articles.extend(scrape_frandroid_html())
+    # 2. Gather Frandroid Web sections
+    frandroid_sections = [
+        ("Frandroid - Actualités", "https://www.frandroid.com/actualites"),
+        ("Frandroid - Bons plans", "https://www.frandroid.com/bons-plans")
+    ]
 
-    # 4. Déduplication stricte par URL (lien identique)
-    unique = {}
-    for a in all_articles:
-        link = a["lien"]
-        if link not in unique or (unique[link]["date"] is None and a["date"] is not None):
-            unique[link] = a
+    for source_name, url in frandroid_sections:
+        print(f"Scraping Web: {source_name}...")
+        items = scrape_frandroid_web(url, source_name)
+        for item in items:
+            link = item["link"]
+            if link not in history:
+                history[link] = item
+                new_items_count += 1
+            else:
+                history[link]["category"] = categorize_article(history[link]["title"], link)
 
-    cleaned_list = list(unique.values())
+    print(f"New articles added: {new_items_count}")
 
-    # 5. Tri chronologique décroissant (plus récents en haut)
+    # Convert dictionary back to list
+    cleaned_list = list(history.values())
+
+    # Sort: Valid dates in descending order on top; items without date at the end
     cleaned_list.sort(
-        key=lambda x: (x["date"] is None, x["date"] or datetime.min.replace(tzinfo=timezone.utc)),
+        key=lambda x: (x["date"] is not None, x["date"] or datetime.min.replace(tzinfo=timezone.utc)),
         reverse=True
     )
 
-    # 6. Écriture dans le CSV final
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    
-    with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.writer(f, delimiter=";")
+    # Save to CSV
+    with open(CSV_FILE, mode="w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
         writer.writerow(["source", "date", "titre", "lien", "categorie"])
 
-        for a in cleaned_list:
-            date_str = a["date"].strftime("%d/%m/%Y %H:%M:%S") if a["date"] else ""
+        for item in cleaned_list:
+            date_str = item["date"].isoformat() if item["date"] else ""
             writer.writerow([
-                a["source"],
+                item["source"],
                 date_str,
-                a["titre"],
-                a["lien"],
-                a["categorie"]
+                item["title"],
+                item["link"],
+                item["category"]
             ])
 
-    print(f"✔ Terminé ! {len(cleaned_list)} articles enregistrés dans {OUTPUT_FILE}")
+    print("CSV updated successfully!")
+
 
 if __name__ == "__main__":
     main()

@@ -333,7 +333,7 @@ def main():
 
     # Save to CSV
     with open(CSV_FILE, mode="w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, delimiter=';')
         writer.writerow(["source", "date", "titre", "lien", "categorie"])
 
         for item in cleaned_list:

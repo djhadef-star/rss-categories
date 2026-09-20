@@ -28,7 +28,7 @@ RSS_FEEDS = {
     "CCM": "https://www.commentcamarche.net/rss/rss-actualites",
 }
 
-# Dictionnaire des 19 catégories mises à jour depuis la capture d'écran
+# Dictionnaire des 19 catégories mises à jour
 CATEGORIES = {
     "1. SMARTPHONE": [
         "smartphone", "téléphone", "phone", "l'iphone", "iphone", "pixel", "flip",
@@ -111,7 +111,7 @@ CATEGORIES = {
         "delonghi", "tefal", "cuisine", "plaque", "four", "cafetière", "café",
         "expresso", "barbecue", "kenwood", "soda", "agrume", "frigo",
         "réfrigérateur", "congélateur", "plante", "jardin", "chauffage",
-        "chaudière", "climatiseur", "prise", "home", "interrupteurs"
+        "chaudière", "climatiseur", "prise", "home", "interrupteurs", "broyeur"
     ],
     "13. Maison": [
         "solaire", "électricité", "compteur", "gaz", "énergie", "edf", "solar",
@@ -148,7 +148,7 @@ CATEGORIES = {
         "interdiction", "réseaux sociaux", "arnaque", "fuite de données",
         "régulateur", "régulation", "légal", "légalité", "illégal", "illégale",
         "anssi", "crypto", "police", "données", "coookies", "ministre",
-        "ministère", "usurpation", "guerre"
+        "ministère", "usurpation", "guerre", "impôts", "fisc"
     ],
     "17. Actualité éco": [
         "dépense", "bourse", "milliards", "rachat", "capitalisation", "acquisition",
@@ -164,8 +164,8 @@ CATEGORIES = {
         "nucléaire", "astéroïde", "cratère", "iss", "l'iss", "spacex"
     ],
     "19. Sponso": [
-        "bon plan", "bons plans", "bonplan", "brade", "promotion", "sponsorisé",
-        "aliexpress", "promo"
+        "bon plan", "bons plans", "bonplan", "bon-plan", "bons-plans", "brade", 
+        "promotion", "sponsorisé", "aliexpress", "promo"
     ]
 }
 
@@ -187,18 +187,37 @@ def clean_url(url):
     )
 
 
-def categorize_article(title, url):
-    raw_text = f"{title} {url}"
-    text_to_check = remove_accents(raw_text)
+def categorize_article(title, url=""):
+    text_title = remove_accents(title)
+    text_url = remove_accents(url)
+
+    first_match_index = float('inf')
+    best_category = "NON_CLASSE"
 
     for category, keywords in CATEGORIES.items():
+        # Pour la catégorie 19 (Sponso), on cherche dans Titre + URL.
+        # Pour toutes les autres catégories, on cherche UNIQUEMENT dans le Titre.
+        if "19" in category or "sponso" in category.lower():
+            text_to_check = f"{text_title} {text_url}"
+        else:
+            text_to_check = text_title
+
         for keyword in keywords:
             clean_keyword = remove_accents(keyword)
-            pattern = r'(?<!\w)' + re.escape(clean_keyword) + r'(?:s|x)?(?!\w)'
-            if re.search(pattern, text_to_check):
-                return category
+            # \b garantit que le mot commence exactement au début (ex: 'RAM' ne matchera pas 'Frame')
+            # \w* autorise le pluriel ou les déclinaisons (ex: 'Tesla' matchera 'Teslas')
+            pattern = r'\b' + re.escape(clean_keyword) + r'\w*'
+            
+            match = re.search(pattern, text_to_check)
+            if match:
+                match_start = match.start()  # Position de la première occurrence
+                
+                # Priorité au mot-clé qui apparaît le plus tôt
+                if match_start < first_match_index:
+                    first_match_index = match_start
+                    best_category = category
 
-    return "NON_CLASSE"
+    return best_category
 
 
 def parse_date(date_str):
@@ -317,7 +336,7 @@ def generate_excel_from_csv():
 
         # Onglets 2 à 20: 19 onglets de catégories
         for cat_name in CATEGORIES.keys():
-            sheet_title = cat_name[:31]  # Limite Excel
+            sheet_title = cat_name[:31]  # Limite de caractères par nom d'onglet Excel
             df_filtered = df_all[df_all["categorie"] == cat_name]
             df_filtered.to_excel(writer, sheet_name=sheet_title, index=False)
 
@@ -346,6 +365,7 @@ def main():
                 history[link] = item
                 new_items_count += 1
             else:
+                # Réévaluation systématique avec la nouvelle logique de catégorisation
                 history[link]["categorie"] = categorize_article(history[link]["titre"], link)
 
     # 2. Scraping spécifique Web Frandroid
@@ -363,6 +383,7 @@ def main():
                 history[link] = item
                 new_items_count += 1
             else:
+                # Réévaluation systématique avec la nouvelle logique de catégorisation
                 history[link]["categorie"] = categorize_article(history[link]["titre"], link)
 
     print(f"Nouveaux articles ajoutés : {new_items_count}")

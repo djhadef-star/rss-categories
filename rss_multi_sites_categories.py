@@ -34,7 +34,7 @@ RSS_FEEDS = {
     "CCM": "https://www.commentcamarche.net/rss/rss-actualites",
 }
 
-# --- DICTIONNAIRE DES 19 CATÉGORIES ---
+# --- DICTIONNAIRE DES 19 CATÉGORIES (MIS À JOUR DEPUIS LA CAPTURE) ---
 CATEGORIES = {
     "1. SMARTPHONE": [
         "smartphone",
@@ -63,10 +63,13 @@ CATEGORIES = {
         "whatsapp",
         "sosh",
         "honor",
-        "one ui",
+        '"one ui"',
         "poco",
         "realme",
-        '"galaxy s"',
+        '"s25"',
+        '"s26"',
+        '"s27"',
+        '"s28"',
         "oppo",
         "pliant",
         "pliable",
@@ -85,7 +88,8 @@ CATEGORIES = {
         "hp",
         "dell",
         "acer",
-        "msi ryzen",
+        "msi",
+        "ryzen",
         "qualcomm",
         '"media tek"',
         "mediatek",
@@ -98,6 +102,11 @@ CATEGORIES = {
         '"cartes mères"',
         "gpu",
         "arm",
+        "laptop",
+        "linux",
+        "bios",
+        "windows",
+        "macos",
     ],
     "3. Periphérique": [
         "clavier",
@@ -120,7 +129,6 @@ CATEGORIES = {
         "dock",
         "usb",
         "usb-c",
-        "ram",
         "chaise",
         '"rj 45"',
         "wifi",
@@ -128,6 +136,8 @@ CATEGORIES = {
         "routeur",
         "netgear",
         "ethernet",
+        "répéteur",
+        "débit",
     ],
     "4. Tablette": [
         "tablette",
@@ -148,13 +158,8 @@ CATEGORIES = {
     "5. Logiciels _ OS": [
         "logiciels",
         "sofware",
-        "windows",
-        "macos",
         '"power toys"',
         "office",
-        "linux",
-        "bios",
-        "os",
         "mail",
         "rss",
         "slack",
@@ -201,11 +206,11 @@ CATEGORIES = {
         "gnome",
         "fedora",
         "ubuntu",
+        "onglet",
     ],
     "6. IA": [
         "l'ia",
         "ia",
-        "ai",
         '"intelligence artificielle"',
         '"data center"',
         "llm",
@@ -226,6 +231,9 @@ CATEGORIES = {
         "groq",
         "midjourney",
         "grok",
+        '"agent ai"',
+        '"outil ai"',
+        '"fonctionnalités ai"',
     ],
     "7. Video": [
         "iptv",
@@ -269,7 +277,7 @@ CATEGORIES = {
         "buds",
         "headphone",
         "jbl",
-        "shockz",
+        "shokz",
         "clip",
         "écouteurs",
         '"réduction de bruit"',
@@ -282,7 +290,10 @@ CATEGORIES = {
         "égaliseur",
         "musique",
         "voix",
-        "son",
+        "platine",
+        "vinyle",
+        "oreille",
+        "openfit",
     ],
     "9. Moiilité douce": [
         "mobilité",
@@ -305,6 +316,7 @@ CATEGORIES = {
         "aéroport",
         "gps",
         "pompe",
+        '"compteur vélo"',
     ],
     "10. Voiture": [
         "voiture",
@@ -390,6 +402,7 @@ CATEGORIES = {
         "nettoyeur",
         "nettoyant",
         "purificateur",
+        "serpillère",
     ],
     "12. Cuisine": [
         "airfryer",
@@ -422,6 +435,9 @@ CATEGORIES = {
         "home",
         "interrupteurs",
         "broyeur",
+        "krups",
+        '"robot tondeuse"',
+        "cuisson",
     ],
     "13. Maison": [
         "solaire",
@@ -435,7 +451,6 @@ CATEGORIES = {
         "box",
         "hue",
         "ikea",
-        "robot",
         "freebox",
         "livebox",
         "home",
@@ -487,6 +502,8 @@ CATEGORIES = {
         "ecg",
         "artérielle",
         "bague",
+        "ring",
+        "rasoir",
     ],
     "15. ludique": [
         "jeu",
@@ -507,6 +524,7 @@ CATEGORIES = {
         "netflix",
         "canal",
         "tf1",
+        "cinema",
         "série",
         "ps6",
         "ps5",
@@ -534,6 +552,18 @@ CATEGORIES = {
         "disney",
         '"game boy"',
         "lego",
+        '"hbo max"',
+        '"apple tv"',
+        "paramount",
+        "saison",
+        '"chef d\'oeuvre"',
+        '"chef-d\'oeuvre"',
+        "roman",
+        "dessin",
+        "dessine",
+        "bande-dessinée",
+        "manga",
+        "teaser",
     ],
     "16. actu jur et pol": [
         "ue",
@@ -604,6 +634,8 @@ CATEGORIES = {
         "guerre",
         "impôts",
         "fisc",
+        "hacker",
+        "conforme",
     ],
     "17. Actualité éco": [
         "dépense",
@@ -659,6 +691,9 @@ CATEGORIES = {
         "iss",
         "l'iss",
         "spacex",
+        "lunaire",
+        "implant",
+        "cerveau",
     ],
     "19. Sponso": [
         '"bon plan"',
@@ -677,290 +712,290 @@ CATEGORIES = {
 
 # --- FONCTIONS UTILITAIRES ---
 def remove_accents(text: str) -> str:
-  """Supprime les accents et passe en minuscules."""
-  if not text:
-    return ""
-  normalized = unicodedata.normalize("NFD", text)
-  return "".join(c for c in normalized if unicodedata.category(c) != "Mn").lower()
+    """Supprime les accents et passe en minuscules."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFD", text)
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn").lower()
 
 
 def clean_url(url: str) -> str:
-  """Nettoie les paramètres UTM de tracking des URLs."""
-  parsed = urllib.parse.urlparse(url)
-  qd = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-  filtered = {k: v for k, v in qd.items() if not k.startswith("utm_")}
-  return urllib.parse.urlunparse(
-      parsed._replace(query=urllib.parse.urlencode(filtered, doseq=True))
-  )
+    """Nettoie les paramètres UTM de tracking des URLs."""
+    parsed = urllib.parse.urlparse(url)
+    qd = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+    filtered = {k: v for k, v in qd.items() if not k.startswith("utm_")}
+    return urllib.parse.urlunparse(
+        parsed._replace(query=urllib.parse.urlencode(filtered, doseq=True))
+    )
 
 
 def build_regex_pattern(keyword: str) -> str:
-  """Construit une regex robuste gérant les blocs entre guillemets et la terminaison \w*."""
-  clean_kw = (
-      remove_accents(keyword)
-      .replace('"', "")
-      .replace("«", "")
-      .replace("»", "")
-      .strip()
-  )
-  if not clean_kw:
-    return None
+    """Construit une regex robuste gérant les blocs entre guillemets et la terminaison \w*."""
+    clean_kw = (
+        remove_accents(keyword)
+        .replace('"', "")
+        .replace("«", "")
+        .replace("»", "")
+        .strip()
+    )
+    if not clean_kw:
+        return None
 
-  words = clean_kw.split()
-  if len(words) > 1:
-    # Expression exacte composée de plusieurs mots
-    first_part = r"\s+".join(re.escape(w) for w in words[:-1])
-    last_part = re.escape(words[-1]) + r"\w*"
-    return r"\b" + first_part + r"\s+" + last_part
-  else:
-    # Mot unique avec début strict de mot et gestion des pluriels/déclinaisons
-    return r"\b" + re.escape(clean_kw) + r"\w*"
+    words = clean_kw.split()
+    if len(words) > 1:
+        # Expression exacte composée de plusieurs mots
+        first_part = r"\s+".join(re.escape(w) for w in words[:-1])
+        last_part = re.escape(words[-1]) + r"\w*"
+        return r"\b" + first_part + r"\s+" + last_part
+    else:
+        # Mot unique avec début strict de mot et gestion des pluriels/déclinaisons
+        return r"\b" + re.escape(clean_kw) + r"\w*"
 
 
 def categorize_article(title: str, url: str = "") -> str:
-  """Classe l'article selon tes règles strictes :
+    """Classe l'article selon tes règles strictes :
 
-  1. Priorité ABSOLUE à la catégorie 19. Sponso (Titre + URL).
-  2. Pour les catégories 1 à 18 : recherche exclusivement dans le Titre,
-     avec priorité au mot-clé / bloc qui apparaît le plus tôt (index le plus petit).
-  """
-  text_title = remove_accents(title)
-  text_url = remove_accents(url)
+    1. Priorité ABSOLUE à la catégorie 19. Sponso (Titre + URL).
+    2. Pour les catégories 1 à 18 : recherche exclusivement dans le Titre,
+       avec priorité au mot-clé / bloc qui apparaît le plus tôt (index le plus petit).
+    """
+    text_title = remove_accents(title)
+    text_url = remove_accents(url)
 
-  # --- 1. RÈGLE SPONSO : PRIORITÉ ABSOLUE (Titre + URL) ---
-  sponso_category = next(
-      (c for c in CATEGORIES if "19" in c or "sponso" in c.lower()), None
-  )
-  if sponso_category:
-    full_text_sponso = f"{text_title} {text_url}"
-    for keyword in CATEGORIES[sponso_category]:
-      pattern = build_regex_pattern(keyword)
-      if pattern and re.search(pattern, full_text_sponso):
-        return sponso_category  # Détection immédiate et prioritaire
+    # --- 1. RÈGLE SPONSO : PRIORITÉ ABSOLUE (Titre + URL) ---
+    sponso_category = next(
+        (c for c in CATEGORIES if "19" in c or "sponso" in c.lower()), None
+    )
+    if sponso_category:
+        full_text_sponso = f"{text_title} {text_url}"
+        for keyword in CATEGORIES[sponso_category]:
+            pattern = build_regex_pattern(keyword)
+            if pattern and re.search(pattern, full_text_sponso):
+                return sponso_category  # Détection immédiate et prioritaire
 
-  # --- 2. CATÉGORIES 1 À 18 : Index du premier mot/bloc dans le Titre uniquement ---
-  first_match_index = float("inf")
-  best_category = "NON_CLASSE"
+    # --- 2. CATÉGORIES 1 À 18 : Index du premier mot/bloc dans le Titre uniquement ---
+    first_match_index = float("inf")
+    best_category = "NON_CLASSE"
 
-  for category, keywords in CATEGORIES.items():
-    if category == sponso_category:
-      continue
+    for category, keywords in CATEGORIES.items():
+        if category == sponso_category:
+            continue
 
-    for keyword in keywords:
-      pattern = build_regex_pattern(keyword)
-      if not pattern:
-        continue
+        for keyword in keywords:
+            pattern = build_regex_pattern(keyword)
+            if not pattern:
+                continue
 
-      match = re.search(pattern, text_title)
-      if match:
-        match_start = match.start()
-        # Conserve la catégorie dont le mot-clé/bloc apparaît le plus tôt
-        if match_start < first_match_index:
-          first_match_index = match_start
-          best_category = category
+            match = re.search(pattern, text_title)
+            if match:
+                match_start = match.start()
+                # Conserve la catégorie dont le mot-clé/bloc apparaît le plus tôt
+                if match_start < first_match_index:
+                    first_match_index = match_start
+                    best_category = category
 
-  return best_category
+    return best_category
 
 
 def parse_date(date_str: str):
-  """Parse les dates ISO et assure une compatibilité des fuseaux horaires (UTC)."""
-  if not date_str:
-    return None
-  try:
-    dt = datetime.fromisoformat(date_str)
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-  except Exception:
-    return None
+    """Parse les dates ISO et assure une compatibilité des fuseaux horaires (UTC)."""
+    if not date_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(date_str)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
 
 
 # --- MODULES DE SCRAPING ---
 def scrape_rss(source_name: str, feed_url: str) -> list:
-  """Scrape un flux RSS standard."""
-  items = []
-  try:
-    feed = feedparser.parse(feed_url)
-    for entry in feed.entries:
-      title = entry.get("title", "").strip()
-      link = clean_url(entry.get("link", "").strip())
-      if not title or not link:
-        continue
+    """Scrape un flux RSS standard."""
+    items = []
+    try:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries:
+            title = entry.get("title", "").strip()
+            link = clean_url(entry.get("link", "").strip())
+            if not title or not link:
+                continue
 
-      dt_tuple = entry.get("published_parsed") or entry.get("updated_parsed")
-      dt = (
-          datetime(*dt_tuple[:6], tzinfo=timezone.utc) if dt_tuple else None
-      )
+            dt_tuple = entry.get("published_parsed") or entry.get("updated_parsed")
+            dt = (
+                datetime(*dt_tuple[:6], tzinfo=timezone.utc) if dt_tuple else None
+            )
 
-      items.append({
-          "source": source_name,
-          "date": dt,
-          "titre": title,
-          "lien": link,
-          "categorie": categorize_article(title, link),
-      })
-  except Exception as e:
-    print(f"Erreur RSS {source_name}: {e}")
-  return items
+            items.append({
+                "source": source_name,
+                "date": dt,
+                "titre": title,
+                "lien": link,
+                "categorie": categorize_article(title, link),
+            })
+    except Exception as e:
+        print(f"Erreur RSS {source_name}: {e}")
+    return items
 
 
 def scrape_frandroid_web(url: str, source_name: str) -> list:
-  """Scrape spécifiquement la structure HTML des pages Web de Frandroid."""
-  items = []
-  try:
-    res = requests.get(url, headers=HEADERS, timeout=10)
-    if res.status_code != 200:
-      return items
+    """Scrape spécifiquement la structure HTML des pages Web de Frandroid."""
+    items = []
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        if res.status_code != 200:
+            return items
 
-    soup = BeautifulSoup(res.text, "html.parser")
-    articles = soup.find_all("article")
+        soup = BeautifulSoup(res.text, "html.parser")
+        articles = soup.find_all("article")
 
-    for article in articles:
-      a_tag = article.find("a", href=True)
-      if not a_tag:
-        continue
+        for article in articles:
+            a_tag = article.find("a", href=True)
+            if not a_tag:
+                continue
 
-      link = clean_url(a_tag["href"])
-      title = a_tag.get_text(strip=True)
-      if not title:
-        continue
+            link = clean_url(a_tag["href"])
+            title = a_tag.get_text(strip=True)
+            if not title:
+                continue
 
-      time_tag = article.find("time")
-      dt = None
-      if time_tag and time_tag.has_attr("datetime"):
-        dt = parse_date(time_tag["datetime"].replace("Z", "+00:00"))
+            time_tag = article.find("time")
+            dt = None
+            if time_tag and time_tag.has_attr("datetime"):
+                dt = parse_date(time_tag["datetime"].replace("Z", "+00:00"))
 
-      items.append({
-          "source": source_name,
-          "date": dt,
-          "titre": title,
-          "lien": link,
-          "categorie": categorize_article(title, link),
-      })
-  except Exception as e:
-    print(f"Erreur Scraping Web {source_name}: {e}")
-  return items
+            items.append({
+                "source": source_name,
+                "date": dt,
+                "titre": title,
+                "lien": link,
+                "categorie": categorize_article(title, link),
+            })
+    except Exception as e:
+        print(f"Erreur Scraping Web {source_name}: {e}")
+    return items
 
 
 # --- HISTORIQUE & EXPORT ---
 def load_existing_history(filepath: str) -> dict:
-  """Charge le fichier CSV d'historique s'il existe pour éviter la perte de données."""
-  history = {}
-  if not os.path.exists(filepath):
-    return history
+    """Charge le fichier CSV d'historique s'il existe pour éviter la perte de données."""
+    history = {}
+    if not os.path.exists(filepath):
+        return history
 
-  with open(filepath, mode="r", encoding="utf-8") as f:
-    reader = csv.DictReader(f, delimiter=";")
-    for row in reader:
-      link = row.get("lien")
-      if link:
-        history[link] = {
-            "source": row.get("source", ""),
-            "date": parse_date(row.get("date")),
-            "titre": row.get("titre", ""),
-            "lien": link,
-            "categorie": row.get("categorie", "NON_CLASSE"),
-        }
-  return history
+    with open(filepath, mode="r", encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter=";")
+        for row in reader:
+            link = row.get("lien")
+            if link:
+                history[link] = {
+                    "source": row.get("source", ""),
+                    "date": parse_date(row.get("date")),
+                    "titre": row.get("titre", ""),
+                    "lien": link,
+                    "categorie": row.get("categorie", "NON_CLASSE"),
+                }
+    return history
 
 
 def generate_excel_from_csv():
-  """Génère le fichier Excel multi-onglets (1 global + 19 catégories + 1 non-classé)."""
-  if not os.path.exists(CSV_FILE):
-    print("CSV introuvable. Annulation de la génération Excel.")
-    return
+    """Génère le fichier Excel multi-onglets (1 global + 19 catégories + 1 non-classé)."""
+    if not os.path.exists(CSV_FILE):
+        print("CSV introuvable. Annulation de la génération Excel.")
+        return
 
-  df_all = pd.read_csv(CSV_FILE, delimiter=";")
+    df_all = pd.read_csv(CSV_FILE, delimiter=";")
 
-  with pd.ExcelWriter(EXCEL_FILE, engine="openpyxl") as writer:
-    # 1. Onglet Tous les articles
-    df_all.to_excel(writer, sheet_name="Tous_les_articles", index=False)
+    with pd.ExcelWriter(EXCEL_FILE, engine="openpyxl") as writer:
+        # 1. Onglet Tous les articles
+        df_all.to_excel(writer, sheet_name="Tous_les_articles", index=False)
 
-    # 2. 19 Onglets par catégorie
-    for cat_name in CATEGORIES.keys():
-      sheet_title = cat_name[:31]  # Contrainte de longueur de nom d'onglet Excel
-      df_filtered = df_all[df_all["categorie"] == cat_name]
-      df_filtered.to_excel(writer, sheet_name=sheet_title, index=False)
+        # 2. 19 Onglets par catégorie
+        for cat_name in CATEGORIES.keys():
+            sheet_title = cat_name[:31]  # Contrainte de longueur de nom d'onglet Excel
+            df_filtered = df_all[df_all["categorie"] == cat_name]
+            df_filtered.to_excel(writer, sheet_name=sheet_title, index=False)
 
-    # 3. Onglet Articles non classés
-    df_unclassed = df_all[df_all["categorie"] == "NON_CLASSE"]
-    if not df_unclassed.empty:
-      df_unclassed.to_excel(writer, sheet_name="NON_CLASSE", index=False)
+        # 3. Onglet Articles non classés
+        df_unclassed = df_all[df_all["categorie"] == "NON_CLASSE"]
+        if not df_unclassed.empty:
+            df_unclassed.to_excel(writer, sheet_name="NON_CLASSE", index=False)
 
-  print(f"Fichier Excel mis à jour : '{EXCEL_FILE}' !")
+    print(f"Fichier Excel mis à jour : '{EXCEL_FILE}' !")
 
 
 # --- MAIN PIPELINE ---
 def main():
-  os.makedirs("output", exist_ok=True)
+    os.makedirs("output", exist_ok=True)
 
-  # 1. Chargement de l'historique existant (sans aucune suppression)
-  history = load_existing_history(CSV_FILE)
-  print(f"Articles dans l'historique initial : {len(history)}")
+    # 1. Chargement de l'historique existant (sans aucune suppression)
+    history = load_existing_history(CSV_FILE)
+    print(f"Articles dans l'historique initial : {len(history)}")
 
-  # 2. Re-catégorisation systématique de l'historique selon les nouvelles règles
-  for link, item in history.items():
-    item["categorie"] = categorize_article(item["titre"], link)
+    # 2. Re-catégorisation systématique de l'historique selon les nouvelles règles
+    for link, item in history.items():
+        item["categorie"] = categorize_article(item["titre"], link)
 
-  new_items_count = 0
+    new_items_count = 0
 
-  # 3. Scraping des flux RSS
-  for source, url in RSS_FEEDS.items():
-    print(f"Scraping RSS : {source}...")
-    items = scrape_rss(source, url)
-    for item in items:
-      link = item["lien"]
-      if link not in history:
-        history[link] = item
-        new_items_count += 1
-      else:
-        history[link]["categorie"] = categorize_article(
-            history[link]["titre"], link
-        )
+    # 3. Scraping des flux RSS
+    for source, url in RSS_FEEDS.items():
+        print(f"Scraping RSS : {source}...")
+        items = scrape_rss(source, url)
+        for item in items:
+            link = item["lien"]
+            if link not in history:
+                history[link] = item
+                new_items_count += 1
+            else:
+                history[link]["categorie"] = categorize_article(
+                    history[link]["titre"], link
+                )
 
-  # 4. Scraping Web Frandroid (Actualités & Bons plans)
-  frandroid_sections = [
-      ("Frandroid - Actualités", "https://www.frandroid.com/actualites"),
-      ("Frandroid - Bons plans", "https://www.frandroid.com/bons-plans"),
-  ]
-  for source_name, url in frandroid_sections:
-    print(f"Scraping Web : {source_name}...")
-    items = scrape_frandroid_web(url, source_name)
-    for item in items:
-      link = item["lien"]
-      if link not in history:
-        history[link] = item
-        new_items_count += 1
-      else:
-        history[link]["categorie"] = categorize_article(
-            history[link]["titre"], link
-        )
+    # 4. Scraping Web Frandroid (Actualités & Bons plans)
+    frandroid_sections = [
+        ("Frandroid - Actualités", "https://www.frandroid.com/actualites"),
+        ("Frandroid - Bons plans", "https://www.frandroid.com/bons-plans"),
+    ]
+    for source_name, url in frandroid_sections:
+        print(f"Scraping Web : {source_name}...")
+        items = scrape_frandroid_web(url, source_name)
+        for item in items:
+            link = item["lien"]
+            if link not in history:
+                history[link] = item
+                new_items_count += 1
+            else:
+                history[link]["categorie"] = categorize_article(
+                    history[link]["titre"], link
+                )
 
-  print(f"Nouveaux articles ajoutés : {new_items_count}")
+    print(f"Nouveaux articles ajoutés : {new_items_count}")
 
-  # 5. Tri antéchronologique
-  cleaned_list = list(history.values())
-  cleaned_list.sort(
-      key=lambda x: (
-          x["date"] is not None,
-          x["date"] or datetime.min.replace(tzinfo=timezone.utc),
-      ),
-      reverse=True,
-  )
+    # 5. Tri antéchronologique
+    cleaned_list = list(history.values())
+    cleaned_list.sort(
+        key=lambda x: (
+            x["date"] is not None,
+            x["date"] or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
 
-  # 6. Écriture du fichier CSV mis à jour
-  with open(CSV_FILE, mode="w", encoding="utf-8", newline="") as f:
-    writer = csv.writer(f, delimiter=";")
-    writer.writerow(["source", "date", "titre", "lien", "categorie"])
-    for item in cleaned_list:
-      date_str = item["date"].isoformat() if item["date"] else ""
-      writer.writerow(
-          [item["source"], date_str, item["titre"], item["lien"], item["categorie"]]
-      )
+    # 6. Écriture du fichier CSV mis à jour
+    with open(CSV_FILE, mode="w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f, delimiter=";")
+        writer.writerow(["source", "date", "titre", "lien", "categorie"])
+        for item in cleaned_list:
+            date_str = item["date"].isoformat() if item["date"] else ""
+            writer.writerow(
+                [item["source"], date_str, item["titre"], item["lien"], item["categorie"]]
+            )
 
-  print("CSV d'historique mis à jour avec succès !")
+    print("CSV d'historique mis à jour avec succès !")
 
-  # 7. Génération du fichier Excel multi-onglets
-  generate_excel_from_csv()
+    # 7. Génération du fichier Excel multi-onglets
+    generate_excel_from_csv()
 
 
 if __name__ == "__main__":
-  main()
+    main()

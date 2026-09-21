@@ -36,7 +36,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f output/rss_history.csv output/rss_history.xlsx output/rss_history.csv_2 output/rss_history.xlsx_2
+          git add -f output/rss_history.csv output/rss_history.xlsx output/rss_history_2.csv output/rss_history_2.xlsx
           git commit -m "Update RSS CSV & Excel (reporting)" || echo "Aucun changement"
           git push
         env:

@@ -10,8 +10,8 @@ import pandas as pd
 import requests
 
 # --- CONFIGURATION DES CHEMINS ---
-CSV_FILE = os.path.join("output", "rss_history.csv")
-EXCEL_FILE = os.path.join("output", "rss_history.xlsx")
+CSV_FILE = os.path.join("output", "rss_history_2.csv")
+EXCEL_FILE = os.path.join("output", "rss_history_2.xlsx")
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,"

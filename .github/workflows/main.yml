@@ -26,18 +26,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install feedparser pandas requests beautifulsoup4 openpyxl
 
-      - name: Run RSS collector 1
-        run: python rss_multi_sites_categories.py
+      - name: Run RSS collector
+        run: python rss_multi_sites_categories_3.py
 
-      - name: Run RSS collector 2
-        run: python rss_multi_sites_categories_2.py
-
-      - name: Commit updated CSV and Excel
+      - name: Commit updated CSV, Excel and RSS Feeds
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f output/rss_history.csv output/rss_history.xlsx output/rss_history_2.csv output/rss_history_2.xlsx
-          git commit -m "Update RSS CSV & Excel (reporting)" || echo "Aucun changement"
+          git add -f output/rss_history_2.csv output/rss_history_2.xlsx output/feed.xml output/feeds/*.xml
+          git commit -m "Update RSS CSV, Excel and Category Feeds (reporting)" || echo "Aucun changement"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

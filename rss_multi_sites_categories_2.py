@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 from datetime import datetime, timezone
 import os
@@ -122,9 +123,6 @@ def clean_url(url: str) -> str:
 
 
 def build_regex_pattern(keyword: str) -> str:
-    """Construit une regex gérant les blocs entre guillemets et les pluriels (s/x)
-    sans capturer les verbes ou mots dérivés plus longs.
-    """
     clean_kw = (
         remove_accents(keyword)
         .replace('"', "")
@@ -145,15 +143,9 @@ def build_regex_pattern(keyword: str) -> str:
 
 
 def categorize_article(title: str, url: str = "") -> str:
-    """Classe l'article selon tes règles strictes :
-    1. Priorité ABSOLUE à la catégorie Sponso (Titre + URL).
-    2. Pour les autres catégories : recherche exclusivement dans le Titre,
-       avec priorité au mot-clé / bloc qui apparaît le plus tôt.
-    """
     text_title = remove_accents(title)
     text_url = remove_accents(url)
 
-    # --- 1. RÈGLE SPONSO : PRIORITÉ ABSOLUE (Titre + URL) ---
     sponso_category = next(
         (c for c in CATEGORIES if "sponso" in c.lower()), None
     )
@@ -164,7 +156,6 @@ def categorize_article(title: str, url: str = "") -> str:
             if pattern and re.search(pattern, full_text_sponso):
                 return sponso_category
 
-    # --- 2. CATÉGORIES STANDARD : Index du premier mot/bloc dans le Titre uniquement ---
     first_match_index = float("inf")
     best_category = "NON_CLASSE"
 
@@ -188,7 +179,6 @@ def categorize_article(title: str, url: str = "") -> str:
 
 
 def parse_date(date_str: str):
-    """Parse les dates ISO et assure une compatibilité des fuseaux horaires (UTC)."""
     if not date_str:
         return None
     try:
@@ -198,17 +188,51 @@ def parse_date(date_str: str):
         return None
 
 
+# --- SCRAPING LÉGER DU CONTENU POUR LE RSS ---
+def fetch_article_description(link: str, original_summary: str = "") -> str:
+    """Tente de récupérer un court extrait ou la description de l'article pour le RSS."""
+    if original_summary and len(original_summary.strip()) > 30:
+        return original_summary.strip()
+    
+    if not link or not link.startswith("http"):
+        return ""
+
+    try:
+        res = requests.get(link, headers=HEADERS, timeout=5)
+        if res.status_code == 200:
+            soup = BeautifulSoup(res.text, "html.parser")
+            # Cherche un paragraphe pertinent ou une méta description
+            meta_desc = soup.find("meta", attrs={"name": "description"})
+            if meta_desc and meta_desc.get("content"):
+                return meta_desc["content"].strip()
+            
+            p_tag = soup.find("p")
+            if p_tag:
+                return p_tag.get_text(strip=True)
+    except Exception:
+        pass
+    return original_summary or ""
+
+
 # --- MODULES DE SCRAPING ---
 def scrape_rss(source_name: str, feed_url: str) -> list:
-    """Scrape un flux RSS standard."""
     items = []
     try:
-        feed = feedparser.parse(feed_url)
+        response = requests.get(feed_url, headers=HEADERS, timeout=10)
+        if response.status_code != 200:
+            return items
+        
+        feed = feedparser.parse(response.content)
         for entry in feed.entries:
             title = entry.get("title", "").strip()
             link = clean_url(entry.get("link", "").strip())
             if not title or not link:
                 continue
+
+            summary = entry.get("summary", "") or entry.get("description", "")
+            # Nettoyage basique des balises HTML du résumé RSS d'origine
+            if summary:
+                summary = BeautifulSoup(summary, "html.parser").get_text(strip=True)
 
             dt_tuple = entry.get("published_parsed") or entry.get("updated_parsed")
             dt = (
@@ -220,6 +244,7 @@ def scrape_rss(source_name: str, feed_url: str) -> list:
                 "date": dt,
                 "titre": title,
                 "lien": link,
+                "description": summary,
                 "categorie": categorize_article(title, link),
             })
     except Exception as e:
@@ -228,7 +253,6 @@ def scrape_rss(source_name: str, feed_url: str) -> list:
 
 
 def scrape_frandroid_web(url: str, source_name: str) -> list:
-    """Scrape spécifiquement la structure HTML des pages Web de Frandroid."""
     items = []
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
@@ -258,6 +282,7 @@ def scrape_frandroid_web(url: str, source_name: str) -> list:
                 "date": dt,
                 "titre": title,
                 "lien": link,
+                "description": "",
                 "categorie": categorize_article(title, link),
             })
     except Exception as e:
@@ -267,7 +292,6 @@ def scrape_frandroid_web(url: str, source_name: str) -> list:
 
 # --- HISTORIQUE & EXPORT ---
 def load_existing_history(filepath: str) -> dict:
-    """Charge le fichier CSV d'historique s'il existe pour éviter la perte de données."""
     history = {}
     if not os.path.exists(filepath):
         return history
@@ -282,13 +306,13 @@ def load_existing_history(filepath: str) -> dict:
                     "date": parse_date(row.get("date")),
                     "titre": row.get("titre", ""),
                     "lien": link,
+                    "description": row.get("description", ""),
                     "categorie": row.get("categorie", "NON_CLASSE"),
                 }
     return history
 
 
 def generate_excel_from_csv():
-    """Génère le fichier Excel multi-onglets (1 global + catégories + 1 non-classé)."""
     if not os.path.exists(CSV_FILE):
         print("CSV introuvable. Annulation de la génération Excel.")
         return
@@ -299,7 +323,7 @@ def generate_excel_from_csv():
         df_all.to_excel(writer, sheet_name="Tous_les_articles", index=False)
 
         for cat_name in CATEGORIES.keys():
-            sheet_title = cat_name[:31]  # Contrainte max d'Excel (31 caractères)
+            sheet_title = cat_name[:31]
             df_filtered = df_all[df_all["categorie"] == cat_name]
             df_filtered.to_excel(writer, sheet_name=sheet_title, index=False)
 
@@ -311,7 +335,6 @@ def generate_excel_from_csv():
 
 
 def generate_rss_xml_from_csv():
-    """Génère un flux RSS XML global structuré."""
     if not os.path.exists(CSV_FILE):
         return
 
@@ -334,6 +357,9 @@ def generate_rss_xml_from_csv():
         if pd.notna(row["date"]):
             ET.SubElement(item, "pubDate").text = str(row["date"])
 
+        desc_text = str(row["description"]) if pd.notna(row["description"]) else ""
+        ET.SubElement(item, "description").text = desc_text
+
         ET.SubElement(item, "category").text = category_name
         ET.SubElement(item, "source").text = str(row["source"]) if pd.notna(row["source"]) else "Inconnu"
 
@@ -343,7 +369,6 @@ def generate_rss_xml_from_csv():
 
 
 def generate_category_rss_feeds():
-    """Génère un flux RSS XML distinct pour chaque catégorie dans output/feeds/."""
     if not os.path.exists(CSV_FILE):
         return
 
@@ -372,6 +397,10 @@ def generate_category_rss_feeds():
             ET.SubElement(item, "link").text = str(row["lien"]) if pd.notna(row["lien"]) else ""
             if pd.notna(row["date"]):
                 ET.SubElement(item, "pubDate").text = str(row["date"])
+            
+            desc_text = str(row["description"]) if pd.notna(row["description"]) else ""
+            ET.SubElement(item, "description").text = desc_text
+
             ET.SubElement(item, "category").text = cat_name
             ET.SubElement(item, "source").text = str(row["source"]) if pd.notna(row["source"]) else "Inconnu"
 
@@ -396,6 +425,10 @@ def generate_category_rss_feeds():
             ET.SubElement(item, "link").text = str(row["lien"])
             if pd.notna(row["date"]):
                 ET.SubElement(item, "pubDate").text = str(row["date"])
+            
+            desc_text = str(row["description"]) if pd.notna(row["description"]) else ""
+            ET.SubElement(item, "description").text = desc_text
+
             ET.SubElement(item, "category").text = "NON_CLASSE"
             ET.SubElement(item, "source").text = str(row["source"])
 
@@ -406,51 +439,71 @@ def generate_category_rss_feeds():
     print("Flux RSS individuels par catégorie générés dans 'output/feeds/' avec succès !")
 
 
-# --- MAIN PIPELINE ---
+# --- MAIN PIPELINE AVEC MULTITHREADING (PARALLÉLISATEUR) ---
 def main():
     os.makedirs("output", exist_ok=True)
 
-    # 1. Chargement de l'historique existant
     history = load_existing_history(CSV_FILE)
     print(f"Articles dans l'historique initial : {len(history)}")
 
-    # 2. Re-catégorisation systématique de l'historique
     for link, item in history.items():
         item["categorie"] = categorize_article(item["titre"], link)
 
     new_items_count = 0
 
-    # 3. Scraping des flux RSS
-    for source, url in RSS_FEEDS.items():
+    # 3. Scraping RSS en parallèle (ultra-rapide)
+    def fetch_single_rss(source, url):
         print(f"Scraping RSS : {source}...")
-        items = scrape_rss(source, url)
-        for item in items:
-            link = item["lien"]
-            if link not in history:
-                history[link] = item
-                new_items_count += 1
-            else:
-                history[link]["categorie"] = categorize_article(
-                    history[link]["titre"], link
-                )
+        return scrape_rss(source, url)
 
-    # 4. Scraping Web Frandroid (Actualités & Bons plans)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_rss = {
+            executor.submit(fetch_single_rss, source, url): source 
+            for source, url in RSS_FEEDS.items()
+        }
+        for future in as_completed(future_to_rss):
+            items = future.result()
+            for item in items:
+                link = item["lien"]
+                if link not in history:
+                    # Enrichissement intelligent de la description si vide
+                    if not item["description"]:
+                        item["description"] = fetch_article_description(link)
+                    history[link] = item
+                    new_items_count += 1
+                else:
+                    history[link]["categorie"] = categorize_article(
+                        history[link]["titre"], link
+                    )
+
+    # 4. Scraping Web Frandroid en parallèle
     frandroid_sections = [
         ("Frandroid - Actualités", "https://www.frandroid.com/actualites"),
         ("Frandroid - Bons plans", "https://www.frandroid.com/bons-plans"),
     ]
-    for source_name, url in frandroid_sections:
+
+    def fetch_single_web(source_name, url):
         print(f"Scraping Web : {source_name}...")
-        items = scrape_frandroid_web(url, source_name)
-        for item in items:
-            link = item["lien"]
-            if link not in history:
-                history[link] = item
-                new_items_count += 1
-            else:
-                history[link]["categorie"] = categorize_article(
-                    history[link]["titre"], link
-                )
+        return scrape_frandroid_web(url, source_name)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_to_web = {
+            executor.submit(fetch_single_web, source_name, url): source_name 
+            for source_name, url in frandroid_sections
+        }
+        for future in as_completed(future_to_web):
+            items = future.result()
+            for item in items:
+                link = item["lien"]
+                if link not in history:
+                    if not item["description"]:
+                        item["description"] = fetch_article_description(link)
+                    history[link] = item
+                    new_items_count += 1
+                else:
+                    history[link]["categorie"] = categorize_article(
+                        history[link]["titre"], link
+                    )
 
     print(f"Nouveaux articles ajoutés : {new_items_count}")
 
@@ -464,19 +517,24 @@ def main():
         reverse=True,
     )
 
-    # 6. Écriture du fichier CSV mis à jour
+    # 6. Écriture du fichier CSV mis à jour avec la colonne description
     with open(CSV_FILE, mode="w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f, delimiter=";")
-        writer.writerow(["source", "date", "titre", "lien", "categorie"])
+        writer.writerow(["source", "date", "titre", "lien", "description", "categorie"])
         for item in cleaned_list:
             date_str = item["date"].isoformat() if item["date"] else ""
-            writer.writerow(
-                [item["source"], date_str, item["titre"], item["lien"], item["categorie"]]
-            )
+            writer.writerow([
+                item["source"], 
+                date_str, 
+                item["titre"], 
+                item["lien"], 
+                item.get("description", ""), 
+                item["categorie"]
+            ])
 
     print("CSV d'historique mis à jour avec succès !")
 
-    # 7. Génération des livrables (Excel + Flux Global + Flux par catégorie)
+    # 7. Génération des livrables
     generate_excel_from_csv()
     generate_rss_xml_from_csv()
     generate_category_rss_feeds()

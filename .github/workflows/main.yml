@@ -27,7 +27,7 @@ jobs:
           pip install feedparser pandas requests beautifulsoup4 openpyxl
 
       - name: Run RSS collector
-        run: python rss_multi_sites_categories_3.py
+        run: python rss_multi_sites_categories_2.py
 
       - name: Commit updated CSV, Excel and RSS Feeds
         run: |
